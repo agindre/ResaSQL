@@ -1,0 +1,9 @@
+TODO :
+- Envoyer un mail à celui qui est passé de liste d'attente à liste principale dans la page suppr_reserv_process
+- Commentage du code
+- Moteur de recherche sur la page liste_depart.php
+- Pagination de la page liste_depart.php
+- Refaire le design
+- Mettre en variable de session la dernière page vue, afin de mettre une sécurité supplémentaire sur les pages process, notamment celles du tunnel de vente (voir si ça n'existe déjà pas, avec les super-variables SERVER ou autres)
+- Ajouter les informations du vol dans le mail de confirmation
+- Faire un .htaccess pour améliorer la sécurité des fichiers inclus (fichiers en .inc.php)
