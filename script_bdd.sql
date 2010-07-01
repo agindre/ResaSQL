@@ -10,6 +10,24 @@ SET client_min_messages = warning;
 SET escape_string_warning = off;
 
 --
+-- Name: projetibd; Type: DATABASE; Schema: -; Owner: simon
+--
+
+CREATE DATABASE projetibd WITH TEMPLATE = template0 ENCODING = 'UTF8' LC_COLLATE = 'fr_FR.utf8' LC_CTYPE = 'fr_FR.utf8';
+
+
+ALTER DATABASE projetibd OWNER TO simon;
+
+\connect projetibd
+
+SET statement_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = off;
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET escape_string_warning = off;
+
+--
 -- Name: plpgsql; Type: PROCEDURAL LANGUAGE; Schema: -; Owner: simon
 --
 
@@ -71,6 +89,52 @@ CREATE DOMAIN dom_unsigned_int AS integer DEFAULT 0
 ALTER DOMAIN public.dom_unsigned_int OWNER TO simon;
 
 --
+-- Name: funct_del_reserv_nb_places(); Type: FUNCTION; Schema: public; Owner: simon
+--
+
+CREATE FUNCTION funct_del_reserv_nb_places() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+statut_del varchar(2);
+BEGIN
+SELECT INTO statut_del statut FROM reservation WHERE code_passager = OLD.code_passager AND num_vol = OLD.num_vol AND jour = OLD.jour AND mois = OLD.mois;
+IF statut_del = 'OK' THEN
+UPDATE depart SET nb_places_disp = nb_places_disp + 1 WHERE num_vol = OLD.num_vol AND jour = OLD.jour AND mois = OLD.mois;
+END IF;
+RETURN OLD;
+END;
+$$;
+
+
+ALTER FUNCTION public.funct_del_reserv_nb_places() OWNER TO simon;
+
+--
+-- Name: funct_ins_reserv_nb_places(); Type: FUNCTION; Schema: public; Owner: simon
+--
+
+CREATE FUNCTION funct_ins_reserv_nb_places() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$                                              
+DECLARE
+statut_ins varchar(2);
+nb_places integer;
+BEGIN
+SELECT INTO statut_ins statut FROM reservation WHERE code_passager = NEW.code_passager AND num_vol = NEW.num_vol AND jour = NEW.jour AND mois = NEW.mois;
+IF statut_ins = 'OK' THEN
+SELECT INTO nb_places nb_places_disp FROM depart WHERE num_vol = NEW.num_vol AND jour = NEW.jour AND mois = NEW.mois;
+IF nb_places <> 0 THEN
+UPDATE depart SET nb_places_disp = nb_places_disp - 1 WHERE num_vol = NEW.num_vol AND jour = NEW.jour AND mois = NEW.mois;
+END IF;
+END IF;
+RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.funct_ins_reserv_nb_places() OWNER TO simon;
+
+--
 -- Name: funct_nb_places(); Type: FUNCTION; Schema: public; Owner: simon
 --
 
@@ -90,6 +154,28 @@ $$;
 
 
 ALTER FUNCTION public.funct_nb_places() OWNER TO simon;
+
+--
+-- Name: funct_passage_la_ok(); Type: FUNCTION; Schema: public; Owner: simon
+--
+
+CREATE FUNCTION funct_passage_la_ok() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+nb_la integer;
+BEGIN
+SELECT INTO nb_la COUNT(code_passager) FROM reservation WHERE num_vol = NEW.num_vol AND jour = NEW.jour AND mois = NEW.mois AND statut = 'LA';
+IF nb_la > 0 THEN
+UPDATE reservation SET statut = 'OK' WHERE num_vol = NEW.num_vol AND jour = NEW.jour AND mois = NEW.mois AND code_passager = (SELECT code_passager FROM reservation WHERE num_vol = NEW.num_vol AND jour = NEW.jour AND mois = NEW.mois AND statut = 'LA' GROUP BY num_vol, jour, mois HAVING date_reserv = MAX(date_reserv));
+UPDATE depart SET nb_places_disp = nb_places_disp - 1 WHERE num_vol = NEW.num_vol AND jour = NEW.jour AND mois = NEW.mois;
+END IF;
+RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.funct_passage_la_ok() OWNER TO simon;
 
 SET default_tablespace = '';
 
@@ -150,7 +236,7 @@ ALTER TABLE public.depart OWNER TO simon;
 --
 
 CREATE TABLE escale (
-    num_vol integer NOT NULL,
+    num_vol bigint NOT NULL,
     num_escale smallint NOT NULL,
     e_continent smallint,
     e_nom_ville character varying(100),
@@ -304,10 +390,7 @@ INSERT INTO continent (code_continent, nom_cont, num_dernier_vol) VALUES (8, 'An
 -- Data for Name: depart; Type: TABLE DATA; Schema: public; Owner: simon
 --
 
-INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000001, 5, 7, 192, 12345);
-INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000002, 7, 7, 35, 37284);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000002, 14, 7, 174, 37284);
-INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000001, 9, 7, 68, 98321);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000001, 16, 7, 73, 78072);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000001, 23, 7, 156, 78072);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000001, 26, 7, 219, 12345);
@@ -317,7 +400,6 @@ INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000002, 28, 7, 217, 28594);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000002, 4, 8, 162, 3385);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000002, 8, 7, 43, 84902);
-INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000002, 15, 7, 82, 73422);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000002, 22, 7, 116, 18944);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000002, 29, 7, 184, 64599);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000002, 5, 8, 193, 27310);
@@ -334,12 +416,17 @@ INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (3000
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000001, 12, 7, 132, 31454);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000001, 19, 7, 150, 85948);
 INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000002, 21, 7, 73, 39610);
+INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000001, 5, 7, 190, 12345);
+INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000001, 9, 7, 67, 98321);
+INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (2000000002, 15, 7, 81, 73422);
+INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000000002, 7, 7, 35, 37284);
 
 
 --
 -- Data for Name: escale; Type: TABLE DATA; Schema: public; Owner: simon
 --
 
+INSERT INTO escale (num_vol, num_escale, e_continent, e_nom_ville, e_h_arr, e_h_dep) VALUES (4000000001, 1, 7, 'Dubai', '2010-07-07 14:00:00+02', '2010-07-07 14:30:00+02');
 
 
 --
@@ -347,12 +434,30 @@ INSERT INTO depart (num_vol, jour, mois, nb_places_disp, num_avion) VALUES (1000
 --
 
 INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('LAU91 0020', 'Laubet-Xavier', 'Simon', '42 cours Blaise Pascal', '91', '06-65-75-05-94', 'laubet.simon@gmail.com', '123456');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('LAU9750001', 'laudnf', 'qgqsg', 'Tapez votqdfsgdre adresse ici...', '975', NULL, 'fsdf.cdsff@dsfsd.com', 'qsdfsq');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('LAU9750002', 'laudnf', 'qgqsg', 'Tapez votqdfsgdre adresse ici...', '975', NULL, 'fsdf.cdsff@dsfsd.com', 'sdfgsd');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('LAU9750003', 'laudnf', 'qgqsg', 'Tapez votqdfsgdre adresse ici...', '975', NULL, 'fsdf.cdsff@dsfsd.com', 'sefdg');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('DFG0100001', 'dfgdf', 'fgdfg', 'Tapezdfgdfg votre adresse ici...', '01', NULL, 'dfgdf.dsq@qsdf.com', 'sdfsd');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('DFG0100002', 'dfgdf', 'fgdfg', 'Tapezdfgdfg votre adresse ici...', '01', NULL, 'dfgdf.dsq@qsdf.com', 'sdfsd');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('DFG0100003', 'dfgdf', 'fgdfg', 'Tapezdfgdfg votre adresse ici...', '01', NULL, 'dfgdf.dsq@qsdf.com', '&é"''');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('DFG0100004', 'dfgdf', 'fgdfg', 'Tapezdfgdfg votre adresse ici...', '01', NULL, 'dfgdf.dsq@qsdf.com', '&é"''');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('DFG0100005', 'dfgdf', 'fgdfg', 'Tapezdfgdfg votre adresse ici...', '01', NULL, 'dfgdf.dsq@qsdf.com', '-è');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('QSD0100001', 'qsdf', 'qsdf', 'Tapez voqsdfre adresse ici...', '01', NULL, 'sdqf.qsdf@sdf.com', '&é"''');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('QSD0100002', 'qsdf', 'qsdf', 'Tapez voqsdfre adresse ici...', '01', NULL, 'sdqf.qsdf@sdf.com', '&é"''');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('QSD0100003', 'qsdf', 'qsdf', 'Tapez voqsdfre adresse ici...', '01', NULL, 'sdqf.qsdf@sdf.com', '&é"');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('QSD0100004', 'qsdf', 'qsdf', 'Tapez voqsdfre adresse ici...', '01', NULL, 'sdqf.qsdf@sdf.com', '&é"');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('HGN0100001', 'hgng', 'hhng', 'Tapegnhz votre adresse ici...', '01', NULL, 'gnh.dfg@sfg.com', '&é"');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('SFE0100001', 'sfegfsd', 'Sfsd', 'Tapez votsdfre adresse ici...', '01', NULL, 'sdfsd.dsf@fsdf.com', 'éé&"');
+INSERT INTO passager (code_passager, nom_pass, prenom_pass, adresse_pass, departmt_pass, tel_pass, mail_pass, mdp_pass) VALUES ('SDF1800001', 'sdfsdf', 'ssdf', 'Tapesdfsdz votre adresse ici...', '18', NULL, 'sdfsd.dsf@fsdf.com', 'sdfdsf');
+
 
 --
 -- Data for Name: reservation; Type: TABLE DATA; Schema: public; Owner: simon
 --
 
-INSERT INTO reservation (code_passager, num_vol, jour, mois, date_reserv, date_limite_reserv, statut) VALUES ('LAU91 0020', 1000000001, 5, 7, '2010-06-28 23:04:37', '2010-07-12 23:04:37', 'OK');
+INSERT INTO reservation (code_passager, num_vol, jour, mois, date_reserv, date_limite_reserv, statut) VALUES ('LAU91 0020', 1000000001, 5, 7, '2010-07-01 19:03:22', '2010-07-15 19:03:22', 'OK');
+INSERT INTO reservation (code_passager, num_vol, jour, mois, date_reserv, date_limite_reserv, statut) VALUES ('LAU91 0020', 2000000001, 9, 7, '2010-07-01 19:03:45', '2010-07-15 19:03:45', 'OK');
+INSERT INTO reservation (code_passager, num_vol, jour, mois, date_reserv, date_limite_reserv, statut) VALUES ('LAU91 0020', 2000000002, 15, 7, '2010-07-01 19:04:24', '2010-07-15 19:04:24', 'OK');
 
 
 --
@@ -491,6 +596,16 @@ ALTER TABLE ONLY vol
 
 
 --
+-- Name: trig_del_reserv; Type: TRIGGER; Schema: public; Owner: simon
+--
+
+CREATE TRIGGER trig_del_reserv
+    BEFORE DELETE ON reservation
+    FOR EACH ROW
+    EXECUTE PROCEDURE funct_del_reserv_nb_places();
+
+
+--
 -- Name: trig_depart_nb_places; Type: TRIGGER; Schema: public; Owner: simon
 --
 
@@ -498,6 +613,26 @@ CREATE TRIGGER trig_depart_nb_places
     BEFORE INSERT OR UPDATE ON depart
     FOR EACH ROW
     EXECUTE PROCEDURE funct_nb_places();
+
+
+--
+-- Name: trig_ins_reserv; Type: TRIGGER; Schema: public; Owner: simon
+--
+
+CREATE TRIGGER trig_ins_reserv
+    AFTER INSERT ON reservation
+    FOR EACH ROW
+    EXECUTE PROCEDURE funct_ins_reserv_nb_places();
+
+
+--
+-- Name: trig_up_depart_la_ok; Type: TRIGGER; Schema: public; Owner: simon
+--
+
+CREATE TRIGGER trig_up_depart_la_ok
+    AFTER UPDATE ON depart
+    FOR EACH ROW
+    EXECUTE PROCEDURE funct_passage_la_ok();
 
 
 --
